@@ -1,21 +1,23 @@
-import { Func0 } from 'funts';
+import { Func0, Mutable } from 'funts';
 import { equals, update } from 'ramda';
 import { isArray } from 'ramda-adjunct';
 import { notNull } from 'rcheck-ts';
 
-type ObjectChildren<T> = { readonly [P in keyof T]: ImmutableValue<T[P]> };
-type ArrayChildren<T> = Array<ImmutableValue<T>>;
+type ObjectChildren<T> = {
+  [P in keyof T]: ImmutableValue<T[P]>;
+};
 
-export interface ImmutableValue<T> {
-  value: T;
-  parent?: ImmutableValue<any>;
-  children?: ObjectChildren<T>;
+interface ArrayChildren<T> extends Array<ImmutableValue<T>> {
+  $itemFactory: Func0<ImmutableValue<T>>;
 }
 
-export interface ImmutableArray<TItem> extends ImmutableValue<ReadonlyArray<TItem>> {
-  children: ArrayChildren<TItem>;
-  itemFactory: Func0<ImmutableValue<TItem>>;
+interface ImmutableContainer<T> {
+  readonly $value: T;
+  readonly $parent?: ImmutableValue<any> | ImmutableArray<any>;
 }
+
+export type ImmutableValue<T> = ImmutableContainer<T> & ObjectChildren<T>;
+export type ImmutableArray<T> = ImmutableContainer<ReadonlyArray<T>> & ArrayChildren<T>;
 
 export function setValue<T>(v: ImmutableValue<T>, val: T): void;
 export function setValue<T>(v: ImmutableArray<T>, val: T[]): void;
@@ -28,65 +30,66 @@ const enum Flags {
 }
 
 function _setValue<T>(v: ImmutableValue<T> | ImmutableArray<T>, val: any, flags: Flags) {
-  if (equals(val, v.value)) {
+  if (equals(val, v.$value)) {
     return;
   }
 
-  v.value = val;
+  (v as Mutable<typeof v>).$value = val;
 
-  const children = v.children;
   // tslint:disable-next-line:no-bitwise
-  if ((flags & Flags.skipUpdateChildren) === 0 && children !== undefined) {
-    if (isArrayChild(children)) {
-      const arr = v as ImmutableArray<T>;
-
-      const minLen = Math.min(arr.children.length, val.length);
+  if ((flags & Flags.skipUpdateChildren) === 0) {
+    if (isArrayChild(v)) {
+      const minLen = Math.min(v.length, val.length);
       for (let i = 0; i < minLen; i++) {
-        _setValue(children[i], val[i], Flags.skipUpdateParent);
+        _setValue((v as any)[i], val[i], Flags.skipUpdateParent);
       }
 
-      if (arr.children.length > val.length) {
-        arr.children.length = val.length;
-      } else if (arr.children.length < val.length) {
+      if (v.length > val.length) {
+        v.length = val.length;
+      } else if (v.length < val.length) {
         for (let i = minLen; i < val.length; i++) {
-          const child = notNull(arr.itemFactory)();
-          child.parent = v as any;
+          const child = notNull(v.$itemFactory)();
+          (child as Mutable<typeof child>).$parent = v as any;
           _setValue(child, val[i], Flags.skipUpdateParent);
-          arr.children.push(child);
+          v.push(child);
         }
       }
     } else {
       // tslint:disable-next-line:forin
-      for (const key in children) {
-        const elem = children[key];
-        _setValue(elem, (val as unknown as any)[key], Flags.skipUpdateParent);
+      for (const key in v) {
+        if (!key.startsWith('$')) {
+          const elem = (v as any)[key];
+          _setValue(elem, (val as unknown as any)[key], Flags.skipUpdateParent);
+        }
       }
     }
   }
 
   // tslint:disable-next-line:no-bitwise
-  if ((flags & Flags.skipUpdateParent) === 0 && v.parent) {
-    onChildChange(v.parent, v as any);
+  if ((flags & Flags.skipUpdateParent) === 0 && v.$parent) {
+    onChildChange(v.$parent, v as any);
   }
 }
 
-function onChildChange<T>(v: ImmutableValue<T>, child: ImmutableValue<any>) {
-  if (!isArrayChild(v.children as any)) {
+function onChildChange<T>(v: ImmutableValue<T> | ImmutableArray<T>, child: ImmutableValue<any>) {
+  if (!isArrayChild(v as any)) {
     // tslint:disable-next-line:forin
-    for (const key in v.children) {
-      const c = v.children[key];
-      if (c === child) {
-        const val = {
-          ...v.value,
-          [key]: child.value,
-        };
-        _setValue(v, val, Flags.skipUpdateChildren);
-        break;
+    for (const key in v) {
+      if (!key.startsWith('$')) {
+        const c = (v as any)[key];
+        if (c === child) {
+          const val = {
+            ...v.$value,
+            [key]: child.$value,
+          };
+          _setValue(v, val, Flags.skipUpdateChildren);
+          break;
+        }
       }
     }
   } else {
-    const idx = (v.children as unknown as Array<ImmutableValue<any>>).indexOf(child);
-    const val = update(idx, child.value, v.value as any);
+    const idx = (v as unknown as Array<ImmutableValue<any>>).indexOf(child);
+    const val = update(idx, child.$value, v.$value as any);
     _setValue(v, val, Flags.skipUpdateChildren);
   }
 }
