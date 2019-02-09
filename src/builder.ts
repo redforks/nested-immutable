@@ -5,33 +5,36 @@ export type ValueFactory<T> = Func0<ImmutableValue<T>>;
 export type ArrayValueFactory<T> = Func0<ImmutableArray<T>>;
 
 export function value<T>(v: T): ValueFactory<T> {
-  return () => ({ value: v });
+  return () => ({ $value: v } as any);
 }
 
 export function object<T>(vals: { [P in keyof T]: ValueFactory<T[P]> }): ValueFactory<T> {
   return () => {
-    const children = {} as any;
     const val = {} as any;
     const r: ImmutableValue<T> = {
-      value: val,
-      children,
-    };
+      $value: val,
+    } as any;
 
     // tslint:disable-next-line:forin
     for (const key in vals) {
+      if (key.startsWith('$')) {
+        continue;
+      }
+
       const child = vals[key]();
-      children[key] = child;
-      child.parent = r;
-      val[key] = child.value;
+      (r as any)[key] = child;
+      (child as any).$parent = r;
+      val[key] = child.$value;
     }
     return r;
   };
 }
 
 export function array<T>(itemFactory: ValueFactory<T>): ArrayValueFactory<T> {
-  return () => ({
-    value: [],
-    children: [],
-    itemFactory,
-  });
+  return () => {
+    const r: any = [];
+    r.$itemFactory = itemFactory;
+    r.$value = [];
+    return r as unknown as ImmutableArray<T>;
+  };
 }
