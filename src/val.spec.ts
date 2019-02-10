@@ -1,6 +1,6 @@
 import { Mutable } from 'funts';
 import { identity } from 'ramda';
-import { ImmutableArray, ImmutableValue, setValue } from './val';
+import { ImmutableArray, ImmutableRecord, ImmutableValue, setValue } from './val';
 
 it('no children, no parent', () => {
   const v: ImmutableValue<number> = { $value: 3 } as any;
@@ -49,6 +49,31 @@ it('update children array', () => {
   ]);
 });
 
+it('update record children', () => {
+  const rec1 = { foo: 1, bar: 2 };
+  const rec2 = { foo: 2, bar: 3 };
+  const rec3 = { foo: 3, bar: 4 };
+  const v: ImmutableRecord<typeof rec1> = {
+    $itemFactory: () => ({
+      foo: { $value: 0 },
+      bar: { $value: 0 },
+    }),
+  } as any;
+
+  setValue(v, { a: rec1, b: rec2 });
+  expect(v.$value).toStrictEqual({ a: rec1, b: rec2 });
+  expect(v.a.$parent).toStrictEqual(v);
+  expect(v.a.$value).toBe(rec1);
+  expect(v.a.foo.$value).toBe(1);
+
+  setValue(v, { b: rec2, c: rec3, d: undefined as any });
+  expect(v.$value).toStrictEqual({ b: rec2, c: rec3, d: undefined });
+  expect(v).not.toHaveProperty('a');
+  expect(v.b.$value).toBe(rec2);
+  expect(v.c.$value).toBe(rec3);
+  expect(v.d.$value).toBeUndefined();
+});
+
 it('update parent object', () => {
   const value = { foo: 1, bar: 2 };
   const v: ImmutableValue<typeof value> = {
@@ -74,4 +99,31 @@ it('update parent array', () => {
   setValue(item1, 10);
   expect(item1.$value).toBe(10);
   expect(v.$value).toEqual([3, 10, 5]);
+});
+
+it('update parent record', () => {
+  const rec1 = { foo: 1, bar: 2 };
+  const rec2 = { foo: 2, bar: 3 };
+  const rec3 = { foo: 3, bar: 4 };
+  const v: ImmutableRecord<typeof rec1> = {
+    $itemFactory: () => {
+      const r: any = {};
+      const foo = { $value: 0, $parent: r };
+      const bar = { $value: 0, $parent: r };
+      r.foo = foo;
+      r.bar = bar;
+      return r;
+    },
+  } as any;
+  setValue(v, { a: rec1, b: rec2 });
+
+  setValue(v.a, rec3);
+  expect(v.a.$value).toBe(rec3);
+  expect(v.$value).toStrictEqual({ a: rec3, b: rec2 });
+
+  setValue(v.b.foo, 10);
+  expect(v.b.foo.$value).toBe(10);
+  expect(v.b.$value).toStrictEqual({ foo: 10, bar: 3 });
+  expect(v.$value).toStrictEqual({ a: rec3, b: { foo: 10, bar: 3 } });
+
 });

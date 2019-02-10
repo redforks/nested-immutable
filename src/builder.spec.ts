@@ -1,4 +1,4 @@
-import { array, object, value } from './builder';
+import { array, object, record, value } from './builder';
 
 // tslint:disable:no-non-null-assertion
 
@@ -65,4 +65,11 @@ it('array', () => {
   expect(f().$value).toStrictEqual([]);
   expect(f().$itemFactory).toStrictEqual(fooFactory);
   expect(f()).toHaveLength(0);
+});
+
+it('record', () => {
+  const f = record<Foo>(fooFactory);
+  const rec = f();
+  expect(rec.$value).toStrictEqual({});
+  expect(rec.$itemFactory).toStrictEqual(fooFactory);
 });

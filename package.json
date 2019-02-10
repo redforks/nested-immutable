@@ -1,6 +1,6 @@
 {
   "name": "nested-immutable",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Nested immutable structure",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",

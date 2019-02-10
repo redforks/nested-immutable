@@ -1,5 +1,5 @@
 import { Func0, Mutable } from 'funts';
-import { equals, update } from 'ramda';
+import { equals, has, update } from 'ramda';
 import { isArray } from 'ramda-adjunct';
 import { notNull } from 'rcheck-ts';
 
@@ -11,17 +11,33 @@ interface ArrayChildren<T> extends Array<ImmutableValue<T>> {
   $itemFactory: Func0<ImmutableValue<T>>;
 }
 
+interface RecordChildren<T> {
+  [key: string]: ImmutableValue<T>;
+}
+
+interface RecordChildrenItemFactory<T> {
+  $itemFactory: Func0<ImmutableValue<T>>;
+}
+
 interface ImmutableContainer<T> {
   readonly $value: T;
   readonly $parent?: ImmutableValue<any> | ImmutableArray<any>;
 }
 
+interface ReadonlyRecord<T> {
+  readonly [key: string]: Readonly<T>;
+}
+
 export type ImmutableValue<T> = ImmutableContainer<T> & ObjectChildren<T>;
 export type ImmutableArray<T> = ImmutableContainer<ReadonlyArray<T>> & ArrayChildren<T>;
+export type ImmutableRecord<T> = ImmutableContainer<ReadonlyRecord<T>> & RecordChildren<T> & RecordChildrenItemFactory<T>;
+
+type ImmutableValues<T> = ImmutableValue<T> | ImmutableArray<T> | ImmutableRecord<T>;
 
 export function setValue<T>(v: ImmutableValue<T>, val: T): void;
 export function setValue<T>(v: ImmutableArray<T>, val: T[]): void;
-export function setValue<T>(v: ImmutableValue<T> | ImmutableArray<T>, val: any) {
+export function setValue<T>(v: ImmutableRecord<T>, val: ReadonlyRecord<T>): void;
+export function setValue<T>(v: ImmutableValues<T>, val: any) {
   _setValue(v, val, 0);
 }
 
@@ -29,7 +45,7 @@ const enum Flags {
   skipUpdateChildren = 1, skipUpdateParent = 2,
 }
 
-function _setValue<T>(v: ImmutableValue<T> | ImmutableArray<T>, val: any, flags: Flags) {
+function _setValue<T>(v: ImmutableValues<T>, val: any, flags: Flags) {
   if (equals(val, v.$value)) {
     return;
   }
@@ -54,6 +70,25 @@ function _setValue<T>(v: ImmutableValue<T> | ImmutableArray<T>, val: any, flags:
           v.push(child);
         }
       }
+    } else if (isRecordChild(v)) {
+      // tslint:disable-next-line:forin
+      for (const key in val) {
+        let child = v[key];
+        if (!child) {
+          child = v[key] = v.$itemFactory();
+          (child as Mutable<typeof child>).$parent = v as any;
+        }
+        _setValue(child, val[key], Flags.skipUpdateParent);
+      }
+
+      for (const key in v) {
+        if (!key.startsWith('$')) {
+          if (!has(key, val)) {
+            (v[key] as Mutable<ImmutableValue<T>>).$parent = undefined;
+            delete v[key];
+          }
+        }
+      }
     } else {
       // tslint:disable-next-line:forin
       for (const key in v) {
@@ -71,7 +106,7 @@ function _setValue<T>(v: ImmutableValue<T> | ImmutableArray<T>, val: any, flags:
   }
 }
 
-function onChildChange<T>(v: ImmutableValue<T> | ImmutableArray<T>, child: ImmutableValue<any>) {
+function onChildChange<T>(v: ImmutableValues<T>, child: ImmutableValue<any>) {
   if (!isArrayChild(v as any)) {
     // tslint:disable-next-line:forin
     for (const key in v) {
@@ -94,6 +129,12 @@ function onChildChange<T>(v: ImmutableValue<T> | ImmutableArray<T>, child: Immut
   }
 }
 
-function isArrayChild<T>(v: ObjectChildren<T> | ArrayChildren<T>): v is ArrayChildren<T> {
+function isArrayChild<T>(
+  v: ObjectChildren<T> | ArrayChildren<T> | RecordChildren<T>): v is ArrayChildren<T> {
   return isArray(v);
+}
+
+function isRecordChild<T>(
+  v: ObjectChildren<T> | RecordChildren<T>): v is RecordChildren<T> {
+  return !!(v as RecordChildren<T>).$itemFactory;
 }

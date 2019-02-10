@@ -1,17 +1,27 @@
 import { Func0 } from 'funts';
 declare type ObjectChildren<T> = {
-    readonly [P in keyof T]: ImmutableValue<T[P]>;
+    [P in keyof T]: ImmutableValue<T[P]>;
 };
-declare type ArrayChildren<T> = Array<ImmutableValue<T>>;
-export interface ImmutableValue<T> {
-    value: T;
-    parent?: ImmutableValue<any>;
-    children?: ObjectChildren<T>;
+interface ArrayChildren<T> extends Array<ImmutableValue<T>> {
+    $itemFactory: Func0<ImmutableValue<T>>;
 }
-export interface ImmutableArray<TItem> extends ImmutableValue<ReadonlyArray<TItem>> {
-    children: ArrayChildren<TItem>;
-    itemFactory: Func0<ImmutableValue<TItem>>;
+interface RecordChildren<T> {
+    [key: string]: ImmutableValue<T>;
 }
+interface RecordChildrenItemFactory<T> {
+    $itemFactory: Func0<ImmutableValue<T>>;
+}
+interface ImmutableContainer<T> {
+    readonly $value: T;
+    readonly $parent?: ImmutableValue<any> | ImmutableArray<any>;
+}
+interface ReadonlyRecord<T> {
+    readonly [key: string]: Readonly<T>;
+}
+export declare type ImmutableValue<T> = ImmutableContainer<T> & ObjectChildren<T>;
+export declare type ImmutableArray<T> = ImmutableContainer<ReadonlyArray<T>> & ArrayChildren<T>;
+export declare type ImmutableRecord<T> = ImmutableContainer<ReadonlyRecord<T>> & RecordChildren<T> & RecordChildrenItemFactory<T>;
 export declare function setValue<T>(v: ImmutableValue<T>, val: T): void;
 export declare function setValue<T>(v: ImmutableArray<T>, val: T[]): void;
+export declare function setValue<T>(v: ImmutableRecord<T>, val: ReadonlyRecord<T>): void;
 export {};
