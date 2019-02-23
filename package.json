@@ -16,17 +16,17 @@
   "license": "MIT",
   "devDependencies": {
     "@types/jest": "^24.0.6",
-    "@types/ramda": "^0.25.47",
+    "@types/ramda": "^0.25.50",
     "jest": "^24.1.0",
-    "mytslint": "^1.3.0",
+    "mytslint": "~1.4.0",
     "ramda": "^0.26.1",
-    "ramda-adjunct": "^2.14.0",
+    "ramda-adjunct": "^2.16.1",
     "ts-jest": "^24.0.0",
     "tslint": "^5.12.1",
-    "typescript": "^3.3.1"
+    "typescript": "~3.2.4"
   },
   "dependencies": {
-    "funts": "^1.6.1",
+    "funts": "^1.6.2",
     "rcheck-ts": "^1.1.0"
   },
   "jest": {
@@ -45,7 +45,7 @@
   },
   "peerDependencies": {
     "ramda": "^0.26.0",
-    "ramda-adjunct": "^2.14.0",
+    "ramda-adjunct": "^2.16.1",
     "tslib": "^1.9.3"
   }
 }
